@@ -41,18 +41,18 @@ var app = {
         });
 
         bluetoothLe.onFound(function(device){
-          console.log("bluetoothLe.onFound", arguments)
+          console.log("bluetoothLe.onFound", device.address,arguments)
           bluetoothLe.list("GREYLIST",device.address);
         });
 
         bluetoothLe.onConnected(function(device){
-          console.log("bluetoothLe.onConnected",arguments);
+          console.log("bluetoothLe.onConnected",device.address,arguments);
           var hrS = bluetoothLe.longify("180D")
           var hrC = bluetoothLe.longify("2A37")
           if(device.services[hrS]&&device.services[hrS].indexOf(hrC)>-1){
             bluetoothLe.subscribe(device.address,hrS,hrC,function(buff){
               var arr = new Uint8Array(buff, 0, buff.length); 
-              console.log("subscribe",arr);
+              console.log("subscribe",device.address,arr);
             });
           }
         });
