@@ -47,12 +47,26 @@ var app = {
 
         bluetoothLe.onConnected(function(device){
           console.log("bluetoothLe.onConnected",device.address,arguments);
-          var hrS = bluetoothLe.longify("180D")
-          var hrC = bluetoothLe.longify("2A37")
+          var hrS = "23434100-1fe4-1eff-80cb-00ff78297d8b";//bluetoothLe.longify("180D")
+          var hrC = "23434101-1fe4-1eff-80cb-00ff78297d8b";//bluetoothLe.longify("2A37")
+          var desc = "00002902-0000-1000-8000-00805f9b34fb";
           if(device.services[hrS]&&device.services[hrS].indexOf(hrC)>-1){
-            bluetoothLe.subscribe(device.address,hrS,hrC,function(buff){
+            console.log("will try to read");
+            bluetoothLe.write(device.address,[02, 00],hrS,hrC,desc,function(buff){
               var arr = new Uint8Array(buff, 0, buff.length); 
-              console.log("subscribe",device.address,arr);
+              console.log("write desc",device.address,arr);
+              bluetoothLe.subscribe(device.address,hrS,hrC,function(buff){
+              var arr = new Uint8Array(buff, 0, buff.length); 
+              console.log("read char",device.address,arr);
+              var lsb = arr[1].toString(16); 
+              var msb = arr[2].toString(16);
+              var parsed = {
+                mUnits : arr[0] & 1 ? "lb" : "Kg",
+                hasTimestamp : !!((arr[0]>>1) & 1),
+                measurement :  parseInt(msb + (lsb.length > 1 ? lsb : "0"+lsb),16) / 10
+              };
+              console.log("parsed data", parsed);
+            });
             });
           }
         });
