@@ -16,6 +16,81 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+var devices = [{
+  name: "NONIN",
+  srv : "46a970e0-0d5f-11e2-8b5e-0002a5d5c51b",
+  chr : "0aad7ea0-0d60-11e2-8e3c-0002a5d5c51b",
+  dsc : "1447af80-0d60-11e2-88b6-0002a5d5c51b",
+  parse : function(arr) {
+    console.log("parse arr length "+arr.length+" =?= " +arr[0]);
+    return {
+      satus : {
+        raw : arr[1],
+        displaySync : (arr[1] & 1) > 0,
+        weakSignal : (arr[1] & 2) > 0,
+        smartPoint : (arr[1] & 4) > 0,
+        searching : (arr[1] & 8) > 0,
+        correctCheck : (arr[1] &  16) > 0,
+        lowBattery : (arr[1] & 32) > 0,
+        encryption : (arr[1] & 64) > 0
+      },
+      battery : (arr[2]*0.1),
+      pAmp : ((arr[3]<<8) + arr[4])/100,
+      counter : (arr[5]<<8) + arr[6],
+      sp02 : arr[7] === 127 ? "missing sp02 data": arr[7],
+      pulse : (((arr[8]<<8) + arr[9]) === 511)? "missing pulse data" : ((arr[8]<<8) + arr[9])
+    }
+  }, 
+  read : function(device) {
+    var s = devices[0].srv;
+    var c = devices[0].chr;
+    var d = devices[0].dsc;
+    if(device.services[s]&&device.services[s].indexOf(c)>-1) {
+      console.log("will try to write nonin desc");
+      bluetoothLe.write(device.address,[0x61,0x05],s,d,function(buff){
+        var arr = new Uint8Array(buff, 0, buff.length); 
+        console.log("write desc",device.address,arr);
+        console.log("will try to read nonin measurement");
+        bluetoothLe.subscribe(device.address,s,c,function(buff){
+          var arr = new Uint8Array(buff, 0, buff.length); 
+          console.log("parsed data", devices[0].parse(arr));
+        });
+      });
+    }
+  }
+}, 
+{
+  name: "Weight Scale",
+  srv : "23434100-1fe4-1eff-80cb-00ff78297d8b",
+  chr : "23434101-1fe4-1eff-80cb-00ff78297d8b",
+  dsc : "00002902-0000-1000-8000-00805f9b34fb",
+  parse : function(arr) {
+    console.log("parse arr length "+arr.length);
+    var lsb = arr[1].toString(16); 
+    var msb = arr[2].toString(16);
+    return {
+      mUnits : arr[0] & 1 ? "lb" : "Kg",
+      hasTimestamp : !!((arr[0]>>1) & 1),
+      measurement :  (arr[1]+(arr[2]<<8)) / 10 
+    };
+  },
+  read : function(device) {
+    var s = devices[1].srv;
+    var c = devices[1].chr;
+    var d = devices[1].dsc;
+    if(device.services[s]&&device.services[s].indexOf(c)>-1) {
+      console.log("will try to write weight desc");
+      bluetoothLe.write(device.address,[0x02, 0x00],s,c,d,function(buff){
+        console.log("will try to read weight measurement");
+        bluetoothLe.subscribe(device.address,s,c,function(buff){
+          var arr = new Uint8Array(buff, 0, buff.length); 
+          console.log("parsed data", devices[1].parse(arr));
+        });
+      });
+    }
+  }
+}];
+
 var app = {
     // Application Constructor
     initialize: function() {
@@ -47,27 +122,8 @@ var app = {
 
         bluetoothLe.onConnected(function(device){
           console.log("bluetoothLe.onConnected",device.address,arguments);
-          var hrS = "23434100-1fe4-1eff-80cb-00ff78297d8b";//bluetoothLe.longify("180D")
-          var hrC = "23434101-1fe4-1eff-80cb-00ff78297d8b";//bluetoothLe.longify("2A37")
-          var desc = "00002902-0000-1000-8000-00805f9b34fb";
-          if(device.services[hrS]&&device.services[hrS].indexOf(hrC)>-1){
-            console.log("will try to read");
-            bluetoothLe.write(device.address,[02, 00],hrS,hrC,desc,function(buff){
-              var arr = new Uint8Array(buff, 0, buff.length); 
-              console.log("write desc",device.address,arr);
-              bluetoothLe.subscribe(device.address,hrS,hrC,function(buff){
-              var arr = new Uint8Array(buff, 0, buff.length); 
-              console.log("read char",device.address,arr);
-              var lsb = arr[1].toString(16); 
-              var msb = arr[2].toString(16);
-              var parsed = {
-                mUnits : arr[0] & 1 ? "lb" : "Kg",
-                hasTimestamp : !!((arr[0]>>1) & 1),
-                measurement :  parseInt(msb + (lsb.length > 1 ? lsb : "0"+lsb),16) / 10
-              };
-              console.log("parsed data", parsed);
-            });
-            });
+          for( dev in devices) {
+            devices[dev].read(device);
           }
         });
         bluetoothLe.startService(function (success) {
