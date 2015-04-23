@@ -54,6 +54,10 @@ var devices = [{
         bluetoothLe.subscribe(device.address,s,c,function(buff){
           var arr = new Uint8Array(buff, 0, buff.length); 
           console.log("parsed data", devices[0].parse(arr));
+          bluetoothLe.write(device.address,[0x62, 0x4E, 0x4D, 0x49],s,d,function(buff){
+            var arr = new Uint8Array(buff, 0, buff.length); 
+            console.log("complete procedure", arr);
+          });
         });
       });
     }
@@ -64,13 +68,27 @@ var devices = [{
   srv : "23434100-1fe4-1eff-80cb-00ff78297d8b",
   chr : "23434101-1fe4-1eff-80cb-00ff78297d8b",
   dsc : "00002902-0000-1000-8000-00805f9b34fb",
+  timeS : "233bf000-5a34-1b6d-975c-000d5690abe4",
+  timeC : "233bf001-5a34-1b6d-975c-000d5690abe4",
   parse : function(arr) {
     console.log("parse arr length "+arr.length);
     var lsb = arr[1].toString(16); 
     var msb = arr[2].toString(16);
+    var hasTimestamp = !!((arr[0]>>1) & 1);
+    var dateM = null;
+    if (hasTimestamp) {
+      var year = (arr[3]+(arr[4]<<8));
+      var month = arr[5];
+      var day = arr[6];
+      var hours = arr[7];
+      var minutes = arr[8];
+      var seconds = arr[9];
+      dateM = new Date(year,month,day,hours,minutes,seconds);
+    }
+
     return {
       mUnits : arr[0] & 1 ? "lb" : "Kg",
-      hasTimestamp : !!((arr[0]>>1) & 1),
+      dateMeasured : dateM,
       measurement :  (arr[1]+(arr[2]<<8)) / 10 
     };
   },
@@ -85,6 +103,29 @@ var devices = [{
         bluetoothLe.subscribe(device.address,s,c,function(buff){
           var arr = new Uint8Array(buff, 0, buff.length); 
           console.log("parsed data", devices[1].parse(arr));
+          
+          var timeConf = [];
+          var date = new Date();
+          timeConf[0] = 9; //length (-1)
+          timeConf[1] = 1; //write
+          timeConf[2] = 1; //CMD
+          timeConf[3] = date.getFullYear()-2000;
+          timeConf[4] = date.getMonth();
+          timeConf[5] = date.getDate();
+          timeConf[6] = date.getHours();
+          timeConf[7] = date.getMinutes();
+          timeConf[8] = date.getSeconds();
+          console.log("now it is ",date);
+          console.log("will try to update date", timeConf);
+
+          bluetoothLe.write(device.address,timeConf,devices[1].timeS,devices[1].timeC,function(buff){
+            var arr = new Uint8Array(buff, 0, buff.length); 
+            console.log("wrote time", arr);
+            bluetoothLe.write(device.address,[0x02,0x00,0x04],devices[1].timeS,devices[1].timeC,function(buff){
+              var arr = new Uint8Array(buff, 0, buff.length); 
+              console.log("read time", arr);
+            });
+          });
         });
       });
     }
