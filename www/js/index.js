@@ -54,9 +54,12 @@ var devices = [{
         bluetoothLe.subscribe(device.address,s,c,function(buff){
           var arr = new Uint8Array(buff, 0, buff.length); 
           console.log("parsed data", devices[0].parse(arr));
-          bluetoothLe.write(device.address,[0x62, 0x4E, 0x4D, 0x49],s,d,function(buff){
-            var arr = new Uint8Array(buff, 0, buff.length); 
-            console.log("complete procedure", arr);
+          bluetoothLe.unsubscribe(device.address,s,c,function(buff){
+            console.log("unsuscribed ", new Uint8Array(buff, 0, buff.length));
+            bluetoothLe.write(device.address,[0x62, 0x4E, 0x4D, 0x49],s,d,function(buff){
+              var arr = new Uint8Array(buff, 0, buff.length); 
+              console.log("complete procedure", arr);
+            });
           });
         });
       });
